@@ -1,0 +1,126 @@
+library(caret)
+library(tidyverse)
+library(leaps)
+library(ggplot2)
+library(reshape2)
+library(MASS)
+library(ggcorrplot)
+library(corrplot)
+library(plotmo)
+library(keras)
+library(kableExtra)
+library(modelr)
+library(psych)
+library(Rmisc)
+library(gridExtra)
+library(scales)
+library(rpart)
+library(yardstick)
+library(cluster)
+library(NbClust)
+library(factoextra)
+library(readxl)
+library(dplyr)
+#renameing col
+colnames(Whitewine_v2)[colnames(Whitewine_v2)%in% c("fixed acidity", "volatile acidity", "citric acid", "residual sugar","free sulfer dioxide","total sulfar dioxide")]<-c("fixed_acidity", "volatile_acidity", "citric_acid", "residual_sugar","free_sulfer_dioxide","total_sulfar_dioxide")
+
+Whitewine_v2
+# Whitewine_v2.labels
+Whitewine_v2.labels = Whitewine_v2$quality
+table(Whitewine_v2.labels)
+
+#remove outliers
+#function for finding upper and lower limit
+outliers <- function(x) {
+  
+  Q1 <- quantile(x, probs=.25)
+  Q3 <- quantile(x, probs=.75)
+  iqr = Q3-Q1
+  
+  upper_limit = Q3 + (iqr*1.5)
+  lower_limit = Q1 - (iqr*1.5)
+  
+  #(x > upper_limit | x < lower_limit)
+  print(upper_limit)
+  print(lower_limit)
+  
+  
+}
+
+#finding upper and lower limit ti each col
+outliers(Whitewine_v2_data$fixed_acidity)
+outliers(Whitewine_v2_data$volatile_acidity)
+outliers(Whitewine_v2_data$citric_acid)
+outliers(Whitewine_v2_data$residual_sugar)
+outliers(Whitewine_v2_data$chlorides)
+outliers(Whitewine_v2_data$free_sulfur_dioxide)
+outliers(Whitewine_v2_data$total_sulfur_dioxide)
+outliers(Whitewine_v2_data$density)
+outliers(Whitewine_v2_data$pH)
+outliers(Whitewine_v2_data$sulphates)
+outliers(Whitewine_v2_data$alcohol)
+
+#remove outliners
+outline_free_data1=subset(Whitewine_v2,8.8>=Whitewine_v2_data$fixed_acidity & 0.485>=Whitewine_v2_data$volatile_acidity& 0.54>=Whitewine_v2_data$citric_acid & 22.45>=Whitewine_v2_data$residual_sugar & 0.071>=chlorides & 79>=Whitewine_v2_data$free_sulfur_dioxide & 254>=Whitewine_v2_data$total_sulfur_dioxide & 1.0027>=Whitewine_v2_data$density & 3.565>=pH & 0.75>=sulphates & 14.25>=alcohol)
+outline_free_data2=subset(outline_free_data1, 0.015<=chlorides & 2.805<=pH)
+outline_free_data3=subset(outline_free_data2, 0.09<=citric_acid )
+outline_free_data4=subset(outline_free_data3, 4.8<=fixed_acidity )
+outline_free_data=subset(outline_free_data4, 22<=total_sulfur_dioxide)
+
+
+newwhine<- outline_free_data[1:11]
+#create boxplot of all  data
+boxplot(newwhine)
+
+# Scale data
+scaled_data <- scale(newwhine)
+#boxplot for scaled data
+boxplot(scaled_data)
+
+# Elbow method
+fviz_nbclust(scaled_data, kmeans, method = "wss") +
+  geom_vline(xintercept = 2, linetype = 2)+
+  labs(subtitle = "Elbow method")
+# Silhouette method
+fviz_nbclust(scaled_data, kmeans, method = "silhouette")+
+  labs(subtitle = "Silhouette method")
+# Gap statistic
+set.seed(123)
+fviz_nbclust(scaled_data, kmeans, nstart = 25,  method = "gap_stat", nboot = 50)+
+  labs(subtitle = "Gap statistic method")
+
+#Kmeans
+km1<-kmeans(scaled_data,centers = 2, nstart = 25)
+km2<-kmeans(scaled_data,centers = 3, nstart = 25)
+km3<-kmeans(scaled_data,centers = 4, nstart = 25)
+print(km1)
+print(km2)
+print(km3)
+km1.clusters<-km1$cluster
+km2.clusters<-km2$cluster
+km3.clusters<-km3$cluster
+
+#CM table
+table(km1.clusters,outline_free_data$quality)
+table(km2.clusters,outline_free_data$quality)
+table(km3.clusters,outline_free_data$quality)
+
+table(outline_free_data$quality,km3.clusters)
+
+#pca
+pca_wine = prcomp(scaled_data, center = TRUE, scale = TRUE)
+summary(pca_wine)
+#taking 9 features as cumulative score>96
+wine_transform= as.data.frame(-pca_wine$x[,1:9])
+
+#Applying kmeans
+k=4
+kmeans_wine = kmeans(wine_transform, centers = k, nstart = 25)
+
+kmeans_wine$withinss
+kmeans_wine$betweenss
+
+km3$withinss
+km3$betweenss
+
+
